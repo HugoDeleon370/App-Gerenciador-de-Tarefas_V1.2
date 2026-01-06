@@ -46,6 +46,7 @@ def listar_tarefas():
 
     return tarefas
 
+
 def exluir_tarefa(tar_id):
     conn = conectar()
     cursor = conn.cursor()
@@ -56,5 +57,29 @@ def exluir_tarefa(tar_id):
     conn.close()
 
 
+def limpar_tarefas():
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM tarefas")
+
+    conn.commit()
+    conn.close()
+
+
 # Executa automaticamente ao importar
 criar_tabela()
+
+
+# Teste manual do SQLite
+if __name__ == "__main__":
+    
+    limpar_tarefas() 
+    inserir_tarefa("Tarefa de teste", "SQLite funcionando", "Pendente")
+
+    tarefas = listar_tarefas()
+    print("Tarefas no banco:")
+
+    for t in tarefas:
+        print(t)
+

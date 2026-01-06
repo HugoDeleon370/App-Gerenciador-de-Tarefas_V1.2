@@ -3,6 +3,8 @@ from tkinter import ttk
 from tkinter import messagebox
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from bd_sqlite import inserir_tarefa, listar_tarefas
+
 
 class ger_tar_app():
 
@@ -53,27 +55,25 @@ class ger_tar_app():
                 self.tabela.delete(item)
 
             try:
-                query = {}
+                if status_filtro == "Todos" or status_filtro is None:
+                    tarefas = listar_tarefas()
+                else:
+                    tarefas = listar_tarefas(status_filtro)
 
-                if status_filtro and status_filtro != "Todos":
-                    query["status"] = status_filtro
-
-                for tarefa in self.colecao.find(query):
+                for tar_id, titulo, descricao, status in tarefas:
                     self.tabela.insert(
                         "",
                         "end",
-                        iid=str(tarefa["_id"]),
-                        values=(
-                            tarefa.get("titulo", ""),
-                            tarefa.get("descricao", ""),
-                            tarefa.get("status", "Pendente")
-                        )
+                        iid=str(tar_id),
+                        values=(titulo, descricao, status)
                     )
+
             except Exception as erro:
                 messagebox.showerror(
                     "Erro ao carregar tarefas",
                     str(erro)
                 )
+
 
         def aplicar_filtro():
             status = self.status_var.get()
@@ -123,20 +123,13 @@ class ger_tar_app():
                 return
 
 
-
-            tarefa = {
-                "titulo": titulo,
-                "descricao": descricao,
-                "status": status
-            }
-
             try:
-                res = self.colecao.insert_one(tarefa)
+                inserir_tarefa(titulo, descricao, status)
 
                 self.tabela.insert(
                     "",
                     "end",
-                    iid=str(res.inserted_id),
+                    #iid=str(res.inserted_id),
                     values=(titulo, descricao, status)
                 )
 
