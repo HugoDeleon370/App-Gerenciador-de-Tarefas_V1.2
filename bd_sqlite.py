@@ -47,7 +47,7 @@ def listar_tarefas():
     return tarefas
 
 
-def exluir_tarefa(tar_id):
+def excluir_tarefa(tar_id):
     conn = conectar()
     cursor = conn.cursor()
 

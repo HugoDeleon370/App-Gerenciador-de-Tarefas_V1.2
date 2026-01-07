@@ -3,7 +3,7 @@ from tkinter import ttk
 from tkinter import messagebox
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from bd_sqlite import inserir_tarefa, listar_tarefas
+from bd_sqlite import inserir_tarefa, listar_tarefas, excluir_tarefa
 
 
 class ger_tar_app():
@@ -209,44 +209,32 @@ class ger_tar_app():
             except Exception as erro:
                 messagebox.showerror("Erro", f"Erro ao atualizar tarefa:\n{erro}")
 
-            
+        def del_tar():
+            item = self.tabela.selection()
 
-        def del_tar():       
-            selecionado = self.tabela.selection()
-
-            if not selecionado:
-                messagebox.showwarning("Atenção", "Selecione uma tarefa para excluir.")
-                return
-
-            tarefa_id = selecionado[0]  # iid da linha (é o _id do MongoDB)
-
-            confirmar = messagebox.askyesno(
-                "Confirmar exclusão",
-                "Tem certeza que deseja excluir esta tarefa?"
-            )
-
-            if not confirmar:
+            if not item:
+                messagebox.showwarning(
+                    "Aviso",
+                    "Selecione uma tarefa para excluir."
+                )
                 return
 
             try:
-                # Excluir do banco
-                self.colecao.delete_one({"_id": ObjectId(tarefa_id)})
+                tar_id = item[0]
 
-                # Excluir da tabela
-                self.tabela.delete(tarefa_id)
+                excluir_tarefa(tar_id)
+                self.tabela.delete(item)
 
-                # Limpar campos após exclusão
-                self.tit_tar.delete(0, "end")
-                self.desc_tar.delete("1.0", "end")
-                self.status_var.set("Pendente")
-                self.tarefa_selecionada_id = None
-
-                messagebox.showinfo("Sucesso", "Tarefa excluída com sucesso!")
+                messagebox.showinfo(
+                    "Sucesso",
+                    "Tarefa excluída com sucesso!"
+                )
 
             except Exception as erro:
-                messagebox.showerror("Erro", f"Erro ao excluir tarefa:\n{erro}")
-
-
+                messagebox.showerror(
+                    "Erro",
+                    str(erro)
+                )
 
         def selecionar_tarefa(event):
             selecionado = self.tabela.selection()
@@ -268,6 +256,8 @@ class ger_tar_app():
             self.desc_tar.insert("1.0", descricao)
 
             self.status_var.set(status)
+
+
 
             
         # -------------------------------------------------------------
