@@ -1,254 +1,170 @@
 import customtkinter as ctk
 from tkinter import ttk
 from tkinter import messagebox
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-from bd_sqlite import inserir_tarefa, listar_tarefas, excluir_tarefa
+# Importa apenas funções SQLite
+from bd_sqlite import (
+    inserir_tarefa,
+    listar_tarefas,
+    excluir_tarefa,
+    atualizar_tarefa,
+    tarefa_existe_pendente
+)
 
 
-class ger_tar_app():
+class ger_tar_app:
 
     def __init__(self, root):
 
         self.root = root
-        self.tarefa_selecionada_id = None
         self.root.title("App")
-        self.root.geometry("800x580")
-        self.root.resizable(False, False) 
+        self.root.geometry("800x500")
+        self.root.resizable(False, False)
         ctk.set_appearance_mode("light")
-
-        # Conexão com o banco de dados
-        try:
-            self.cliente = MongoClient("mongodb+srv://user_hd:tgYkDOOvW0WGdZaS@cluster0.yd1ejkl.mongodb.net/?appName=Cluster0") 
-            self.bd = self.cliente["tarefas"]
-            self.colecao = self.bd["ger_tar_bd"]
-            print(f"Conexão realizada com sucesso!")
-        except Exception as excecao:
-            print(f"Não conectado ao Banco de dados!", excecao)
-        
 
         # -------------------------------------------------------------
         # TÍTULO DA TAREFA
         # -------------------------------------------------------------
 
-        ctk.CTkLabel(root, text="Título da Tarefa: ", font=("Arial bold", 15)).grid(row=0, column=0, columnspan=1, sticky="e",pady=15, padx=20)
-        
-        self.tit_tar = ctk.CTkEntry(root, width=445, border_width=1, border_color="#5e5e5e")
-        self.tit_tar.grid(row=0, column=1, columnspan=1, pady=10)
+        ctk.CTkLabel(
+            root,
+            text="Título da Tarefa:",
+            font=("Arial bold", 15)
+        ).grid(row=0, column=0, sticky="e", pady=15, padx=20)
+
+        self.tit_tar = ctk.CTkEntry(
+            root,
+            width=445,
+            border_width=1,
+            border_color="#5e5e5e"
+        )
+        self.tit_tar.grid(row=0, column=1, pady=10)
 
         # -------------------------------------------------------------
         # DESCRIÇÃO DA TAREFA
         # -------------------------------------------------------------
 
-        ctk.CTkLabel(root, text="Descrição da Tarefa: ", font=("Arial bold", 15)).grid(row=1, column=0, pady=10, sticky="n", columnspan=1, padx=20)
+        ctk.CTkLabel(
+            root,
+            text="Descrição da Tarefa:",
+            font=("Arial bold", 15)
+        ).grid(row=1, column=0, pady=10, sticky="n", padx=20)
 
-        self.desc_tar = ctk.CTkTextbox(root, width=445, height=100, border_width=1, border_color="#5e5e5e")
-        self.desc_tar.grid(row=1, column=1, columnspan=1, pady=10)
+        self.desc_tar = ctk.CTkTextbox(
+            root,
+            width=445,
+            height=100,
+            border_width=1,
+            border_color="#5e5e5e"
+        )
+        self.desc_tar.grid(row=1, column=1, pady=10)
 
         # -------------------------------------------------------------
-        # FUNÇÕES dos botões
+        # FUNÇÕES INTERNAS (CALLBACKS)
         # -------------------------------------------------------------
 
         def carregar_tarefas(status_filtro=None):
-            # Limpa a tabela
-            for item in self.tabela.get_children():
-                self.tabela.delete(item)
+            """Carrega tarefas do SQLite na tabela"""
 
-            try:
-                if status_filtro == "Todos" or status_filtro is None:
-                    tarefas = listar_tarefas()
-                else:
-                    tarefas = listar_tarefas(status_filtro)
+            self.tabela.delete(*self.tabela.get_children())
 
-                for tar_id, titulo, descricao, status in tarefas:
-                    self.tabela.insert(
-                        "",
-                        "end",
-                        iid=str(tar_id),
-                        values=(titulo, descricao, status)
-                    )
+            tarefas = (
+                listar_tarefas()
+                if status_filtro in (None, "Todos")
+                else listar_tarefas(status_filtro)
+            )
 
-            except Exception as erro:
-                messagebox.showerror(
-                    "Erro ao carregar tarefas",
-                    str(erro)
+            for tar_id, titulo, descricao, status in tarefas:
+                self.tabela.insert(
+                    "",
+                    "end",
+                    iid=str(tar_id),
+                    values=(titulo, descricao, status)
                 )
 
-
         def aplicar_filtro():
-            status = self.status_var.get()
-            carregar_tarefas(status)
+            carregar_tarefas(self.status_var.get())
 
+        def limpar_campos():
+            """Limpa campos de entrada e seleção"""
+            self.tit_tar.delete(0, "end")
+            self.desc_tar.delete("1.0", "end")
+            self.status_var.set("Pendente")
+            self.tabela.selection_remove(self.tabela.selection())
 
         def add_tar():
             titulo = self.tit_tar.get().strip()
             descricao = self.desc_tar.get("1.0", "end").strip()
             status = self.status_var.get()
+
             if status == "Todos":
                 status = "Pendente"
-
 
             if not titulo or not descricao:
                 messagebox.showwarning("Campos vazios", "Preencha todos os campos.")
                 return
-            
-                    # Verifica se já existe tarefa com o mesmo título
-            tarefa_existente = self.colecao.find_one({
-                "titulo": titulo,
-                "status": "Pendente"
-            })
 
-
-            if tarefa_existente:
+            # Validação de duplicidade (SQLite)
+            if tarefa_existe_pendente(titulo):
                 messagebox.showwarning(
-                    "Tarefa já existente",
-                    f"Já existe uma tarefa chamada '{titulo}'.\n"
-                    "Conclua a tarefa existente antes de criar outra com o mesmo nome."
-                )
-                return
-           
-                        # Validação de tamanho
-            if len(titulo) > 30:
-                messagebox.showwarning(
-                    "Título muito longo",
-                    "O nome da tarefa deve ter no máximo 30 caracteres."
+                    "Tarefa existente",
+                    f"Já existe uma tarefa pendente chamada '{titulo}'."
                 )
                 return
 
-            if len(descricao) > 150:
+            if len(titulo) > 30 or len(descricao) > 150:
                 messagebox.showwarning(
-                    "Descrição muito longa",
-                    "A descrição pode conter até 150 caracteres."
+                    "Limite excedido",
+                    "Título: 30 caracteres | Descrição: 150 caracteres."
                 )
                 return
 
+            inserir_tarefa(titulo, descricao, status)
+            carregar_tarefas("Todos")
+            limpar_campos()
 
-            try:
-                inserir_tarefa(titulo, descricao, status)
-
-                self.tabela.insert(
-                    "",
-                    "end",
-                    #iid=str(res.inserted_id),
-                    values=(titulo, descricao, status)
-                )
-
-                messagebox.showinfo("Sucesso", "Tarefa adicionada com sucesso!")
-
-                # Limpar campos
-                self.tit_tar.delete(0, "end")
-                self.desc_tar.delete("1.0", "end")
-                self.status_var.set("Pendente")
-
-            except Exception as erro:
-                messagebox.showerror("Erro", f"Erro ao inserir tarefa:\n{erro}")
-
-
+            messagebox.showinfo("Sucesso", "Tarefa adicionada com sucesso!")
 
         def up_tar():
             selecionado = self.tabela.selection()
 
             if not selecionado:
-                messagebox.showwarning(
-                    "Atenção",
-                    "Selecione uma tarefa para atualizar."
-                )
+                messagebox.showwarning("Atenção", "Selecione uma tarefa.")
                 return
 
-            tarefa_id = selecionado[0]
+            tar_id = selecionado[0]
 
-            titulo = self.tit_tar.get().strip()
-            descricao = self.desc_tar.get("1.0", "end").strip()
-            status = self.status_var.get()
-            if status == "Todos":
-                status = "Pendente"
+            atualizar_tarefa(
+                tar_id,
+                self.tit_tar.get().strip(),
+                self.desc_tar.get("1.0", "end").strip(),
+                self.status_var.get()
+            )
 
+            carregar_tarefas("Todos")
+            limpar_campos()
 
-            if not titulo or not descricao:
-                messagebox.showwarning("Campos vazios", "Preencha todos os campos.")
-                return
-
-            # Validação de tamanho
-            if len(titulo) > 30:
-                messagebox.showwarning(
-                    "Título muito longo",
-                    "O nome da tarefa deve ter no máximo 30 caracteres."
-                )
-                return
-
-            if len(descricao) > 150:
-                messagebox.showwarning(
-                    "Descrição muito longa",
-                    "A descrição pode conter até 150 caracteres."
-                )
-                return
-
-            try:
-                self.colecao.update_one(
-                    {"_id": ObjectId(tarefa_id)},
-                    {"$set": {
-                        "titulo": titulo,
-                        "descricao": descricao,
-                        "status": status
-                    }}
-                )
-
-                self.tabela.item(
-                    tarefa_id,
-                    values=(titulo, descricao, status)
-                )
-
-                messagebox.showinfo("Sucesso", "Tarefa atualizada com sucesso!")
-
-                # Limpar campos e seleção
-                self.tabela.selection_remove(tarefa_id)
-                self.tit_tar.delete(0, "end")
-                self.desc_tar.delete("1.0", "end")
-                self.status_var.set("Pendente")
-
-            except Exception as erro:
-                messagebox.showerror("Erro", f"Erro ao atualizar tarefa:\n{erro}")
+            messagebox.showinfo("Sucesso", "Tarefa atualizada com sucesso!")
 
         def del_tar():
-            item = self.tabela.selection()
-
-            if not item:
-                messagebox.showwarning(
-                    "Aviso",
-                    "Selecione uma tarefa para excluir."
-                )
-                return
-
-            try:
-                tar_id = item[0]
-
-                excluir_tarefa(tar_id)
-                self.tabela.delete(item)
-
-                messagebox.showinfo(
-                    "Sucesso",
-                    "Tarefa excluída com sucesso!"
-                )
-
-            except Exception as erro:
-                messagebox.showerror(
-                    "Erro",
-                    str(erro)
-                )
-
-        def selecionar_tarefa(event):
             selecionado = self.tabela.selection()
 
             if not selecionado:
+                messagebox.showwarning("Aviso", "Selecione uma tarefa.")
                 return
 
-            tarefa_id = selecionado[0]
-            self.tarefa_selecionada_id = tarefa_id
-            valores = self.tabela.item(tarefa_id, "values")
+            excluir_tarefa(selecionado[0])
+            carregar_tarefas("Todos")
+            limpar_campos()
 
-            titulo, descricao, status = valores
+            messagebox.showinfo("Sucesso", "Tarefa excluída com sucesso!")
 
-            # Preencher campos
+        def selecionar_tarefa(event):
+            item = self.tabela.selection()
+            if not item:
+                return
+
+            titulo, descricao, status = self.tabela.item(item, "values")
+
             self.tit_tar.delete(0, "end")
             self.tit_tar.insert(0, titulo)
 
@@ -257,95 +173,59 @@ class ger_tar_app():
 
             self.status_var.set(status)
 
-
-
-            
         # -------------------------------------------------------------
-        # BOTÕES: Adicionar / Atualizar / Excluir
+        # BOTÕES
         # -------------------------------------------------------------
 
-        btn = ctk.CTkFrame(root)
-        btn.grid(row=2, column=1, pady=15, sticky="w", columnspan=2)
+        btn_frame = ctk.CTkFrame(root)
+        btn_frame.grid(row=2, column=1, pady=15, sticky="w")
 
-       
-        self.btn_add = ctk.CTkButton(btn, text="Adicionar", text_color="#000000", command=add_tar)
-        self.btn_add.grid(row=2, column=0, padx=5)
-
-        btn_up = ctk.CTkButton(btn, text="Atualizar", text_color="#000000", command=up_tar)
-        btn_up.grid(row=2, column=1, padx=5)
-
-        btn_del = ctk.CTkButton(btn, text="Excluir", text_color="#000000", command=del_tar)
-        btn_del.grid(row=2, column=2, padx=5)
+        ctk.CTkButton(btn_frame, text="Adicionar", command=add_tar).grid(row=0, column=0, padx=5)
+        ctk.CTkButton(btn_frame, text="Atualizar", command=up_tar).grid(row=0, column=1, padx=5)
+        ctk.CTkButton(btn_frame, text="Excluir", command=del_tar).grid(row=0, column=2, padx=5)
 
         # -------------------------------------------------------------
-        # STATUS (TAREFA + FUTURO FILTRO)
+        # STATUS + FILTRO
         # -------------------------------------------------------------
 
-        ctk.CTkLabel(
-            root,
-            text="Status:",
-            font=("Arial bold", 15)
-        ).grid(row=3, column=0, sticky="e", padx=20, pady=15)
+        self.status_var = ctk.StringVar(value="Pendente")
 
-        self.status_var = ctk.StringVar(self.root, value="Pendente")
-
-        self.status_menu = ctk.CTkOptionMenu(
+        ctk.CTkOptionMenu(
             root,
             values=["Pendente", "Concluída", "Todos"],
-            variable=self.status_var,
-            width=150,
-            text_color="#000000",
-            dropdown_hover_color="#0870b1"
-        )
-        self.status_menu.grid(row=3, column=1, sticky="w")
+            variable=self.status_var
+        ).grid(row=3, column=1, sticky="w")
 
-        btn_flt = ctk.CTkButton(
+        ctk.CTkButton(
             root,
             text="Aplicar Filtro",
-            text_color="#000000",
-            width=230,
             command=aplicar_filtro
+        ).grid(row=3, column=1, sticky="e", padx=30)
+
+        # -------------------------------------------------------------
+        # TABELA
+        # -------------------------------------------------------------
+
+        self.tabela = ttk.Treeview(
+            root,
+            columns=("Título", "Descrição", "Status"),
+            show="headings"
         )
-        btn_flt.grid(row=3, column=1, padx=30, sticky="e")
 
-        
-        # -------------------------------------------------------------
-        # self.TABELA DE EXIBIÇÃO
-        # -------------------------------------------------------------
-
-        tarefas = []
-        
-        self.tabela = ttk.Treeview(self.root, columns=("Tìtulo", "Descrição", "Status"), show="headings")
-
-
-        self.tabela.column("Tìtulo", minwidth=1, width=150)
-        self.tabela.column("Descrição", minwidth=0, width=350)
-        self.tabela.column("Status", minwidth=0, width=100)
-
-        self.tabela.heading("Tìtulo", text="Tarefa")
+        self.tabela.heading("Título", text="Tarefa")
         self.tabela.heading("Descrição", text="Descrição")
         self.tabela.heading("Status", text="Status")
 
-        self.tabela.grid(row=4, column=1, columnspan=4)
-
+        self.tabela.grid(row=4, column=1, columnspan=3, pady=(15, 0))
         self.tabela.bind("<<TreeviewSelect>>", selecionar_tarefa)
 
-
-        for (t, d, s) in tarefas:
-            tarefas.insert("", "end", values=(t, d, s))
-
-        
         carregar_tarefas("Todos")
 
 
-
 # -------------------------------------------------------------
-# INICIALIZAÇÃO DA JANELA
+# INICIALIZAÇÃO
 # -------------------------------------------------------------
 
 root = ctk.CTk()
-
-app = ger_tar_app (root)
-root.mainloop()    
-
-
+app = ger_tar_app(root)
+root.mainloop()
