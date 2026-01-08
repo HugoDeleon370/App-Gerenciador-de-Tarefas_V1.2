@@ -16,7 +16,7 @@ class ger_tar_app:
     def __init__(self, root):
 
         self.root = root
-        self.root.title("App")
+        self.root.title("HD Tecnology")
         self.root.geometry("800x500")
         self.root.resizable(False, False)
         ctk.set_appearance_mode("light")
@@ -149,14 +149,33 @@ class ger_tar_app:
             selecionado = self.tabela.selection()
 
             if not selecionado:
-                messagebox.showwarning("Aviso", "Selecione uma tarefa.")
+                messagebox.showwarning(
+                    "Aviso",
+                    "Selecione uma tarefa para excluir."
+                )
                 return
 
-            excluir_tarefa(selecionado[0])
-            carregar_tarefas("Todos")
+            resposta = messagebox.askyesno(
+                "Confirmar exclusão",
+                "Tem certeza que deseja excluir esta tarefa?"
+            )
+
+            if not resposta:
+                return
+
+            # pega os valores da linha selecionada
+            valores = self.tabela.item(selecionado[0], "values")
+            tar_id = valores[0]  # ID vem da primeira coluna
+
+            excluir_tarefa(tar_id)
+            carregar_tarefas(self.status_var.get())
             limpar_campos()
 
-            messagebox.showinfo("Sucesso", "Tarefa excluída com sucesso!")
+            messagebox.showinfo(
+                "Sucesso",
+                "Tarefa excluída com sucesso!"
+            )
+
 
         def selecionar_tarefa(event):
             item = self.tabela.selection()
