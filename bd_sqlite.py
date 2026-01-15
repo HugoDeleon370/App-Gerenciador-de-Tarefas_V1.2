@@ -1,9 +1,21 @@
 import sqlite3
+import os
+import sys
 
-SQLITE_DB = "tarefas.db"
+
+def caminho_db():
+    if getattr(sys, 'frozen', False):
+        # executando como .exe
+        pasta_base = os.path.dirname(sys.executable)
+    else:
+        # executando como script .py
+        pasta_base = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(pasta_base, "tarefas.db")
+
 
 def conectar():
-    conn = sqlite3.connect(SQLITE_DB)
+    conn = sqlite3.connect(caminho_db())
     return conn
 
 
@@ -136,4 +148,3 @@ if __name__ == "__main__":
 
     for t in tarefas:
         print(t)
-

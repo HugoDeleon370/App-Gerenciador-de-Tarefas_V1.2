@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import ttk
 from tkinter import messagebox
-# Importa apenas funções SQLite
+
 from bd_sqlite import (
     inserir_tarefa,
     listar_tarefas,
@@ -17,19 +17,26 @@ class ger_tar_app:
 
         self.root = root
         self.root.title("HD Tecnology")
-        self.root.geometry("800x500")
+        self.root.geometry("800x520")
         self.root.resizable(False, False)
         ctk.set_appearance_mode("light")
 
-        # -------------------------------------------------------------
+        # =============================================================
+        # VARIÁVEIS DE CONTROLE
+        # =============================================================
+
+        self.status_var = ctk.StringVar(value="Pendente")  # status da tarefa
+        self.filtro_var = ctk.StringVar(value="Todos")    # filtro da tabela
+
+        # =============================================================
         # TÍTULO DA TAREFA
-        # -------------------------------------------------------------
+        # =============================================================
 
         ctk.CTkLabel(
             root,
             text="Título da Tarefa:",
             font=("Arial bold", 15)
-        ).grid(row=0, column=0, sticky="e", pady=15, padx=20)
+        ).grid(row=0, column=0, sticky="e", pady=10, padx=20)
 
         self.tit_tar = ctk.CTkEntry(
             root,
@@ -39,15 +46,15 @@ class ger_tar_app:
         )
         self.tit_tar.grid(row=0, column=1, pady=10)
 
-        # -------------------------------------------------------------
+        # =============================================================
         # DESCRIÇÃO DA TAREFA
-        # -------------------------------------------------------------
+        # =============================================================
 
         ctk.CTkLabel(
             root,
             text="Descrição da Tarefa:",
             font=("Arial bold", 15)
-        ).grid(row=1, column=0, pady=10, sticky="n", padx=20)
+        ).grid(row=1, column=0, sticky="ne", pady=10, padx=20)
 
         self.desc_tar = ctk.CTkTextbox(
             root,
@@ -58,13 +65,27 @@ class ger_tar_app:
         )
         self.desc_tar.grid(row=1, column=1, pady=10)
 
-        # -------------------------------------------------------------
-        # FUNÇÕES INTERNAS (CALLBACKS)
-        # -------------------------------------------------------------
+        # =============================================================
+        # STATUS DA TAREFA
+        # =============================================================
+
+        ctk.CTkLabel(
+            root,
+            text="Status da Tarefa:",
+            font=("Arial bold", 14)
+        ).grid(row=2, column=0, sticky="e", padx=20)
+
+        ctk.CTkOptionMenu(
+            root,
+            values=["Pendente", "Concluída"],
+            variable=self.status_var
+        ).grid(row=2, column=1, sticky="w")
+
+        # =============================================================
+        # FUNÇÕES INTERNAS
+        # =============================================================
 
         def carregar_tarefas(status_filtro=None):
-            """Carrega tarefas do SQLite na tabela"""
-
             self.tabela.delete(*self.tabela.get_children())
 
             tarefas = (
@@ -82,10 +103,9 @@ class ger_tar_app:
                 )
 
         def aplicar_filtro():
-            carregar_tarefas(self.status_var.get())
+            carregar_tarefas(self.filtro_var.get())
 
         def limpar_campos():
-            """Limpa campos de entrada e seleção"""
             self.tit_tar.delete(0, "end")
             self.desc_tar.delete("1.0", "end")
             self.status_var.set("Pendente")
@@ -96,14 +116,10 @@ class ger_tar_app:
             descricao = self.desc_tar.get("1.0", "end").strip()
             status = self.status_var.get()
 
-            if status == "Todos":
-                status = "Pendente"
-
             if not titulo or not descricao:
                 messagebox.showwarning("Campos vazios", "Preencha todos os campos.")
                 return
 
-            # Validação de duplicidade (SQLite)
             if tarefa_existe_pendente(titulo):
                 messagebox.showwarning(
                     "Tarefa existente",
@@ -163,19 +179,16 @@ class ger_tar_app:
             if not resposta:
                 return
 
-            # pega os valores da linha selecionada
-            valores = self.tabela.item(selecionado[0], "values")
-            tar_id = valores[0]  # ID vem da primeira coluna
+            tar_id = selecionado[0]
 
             excluir_tarefa(tar_id)
-            carregar_tarefas(self.status_var.get())
+            carregar_tarefas("Todos")
             limpar_campos()
 
             messagebox.showinfo(
                 "Sucesso",
                 "Tarefa excluída com sucesso!"
             )
-
 
         def selecionar_tarefa(event):
             item = self.tabela.selection()
@@ -192,38 +205,36 @@ class ger_tar_app:
 
             self.status_var.set(status)
 
-        # -------------------------------------------------------------
+        # =============================================================
         # BOTÕES
-        # -------------------------------------------------------------
+        # =============================================================
 
         btn_frame = ctk.CTkFrame(root)
-        btn_frame.grid(row=2, column=1, pady=15, sticky="w")
+        btn_frame.grid(row=3, column=1, pady=15, sticky="w")
 
         ctk.CTkButton(btn_frame, text="Adicionar", command=add_tar).grid(row=0, column=0, padx=5)
         ctk.CTkButton(btn_frame, text="Atualizar", command=up_tar).grid(row=0, column=1, padx=5)
         ctk.CTkButton(btn_frame, text="Excluir", command=del_tar).grid(row=0, column=2, padx=5)
 
-        # -------------------------------------------------------------
-        # STATUS + FILTRO
-        # -------------------------------------------------------------
-
-        self.status_var = ctk.StringVar(value="Pendente")
+        # =============================================================
+        # FILTRO
+        # =============================================================
 
         ctk.CTkOptionMenu(
             root,
             values=["Pendente", "Concluída", "Todos"],
-            variable=self.status_var
-        ).grid(row=3, column=1, sticky="w")
+            variable=self.filtro_var
+        ).grid(row=4, column=1, sticky="w")
 
         ctk.CTkButton(
             root,
             text="Aplicar Filtro",
             command=aplicar_filtro
-        ).grid(row=3, column=1, sticky="e", padx=30)
+        ).grid(row=4, column=1, sticky="e", padx=30)
 
-        # -------------------------------------------------------------
+        # =============================================================
         # TABELA
-        # -------------------------------------------------------------
+        # =============================================================
 
         self.tabela = ttk.Treeview(
             root,
@@ -235,15 +246,15 @@ class ger_tar_app:
         self.tabela.heading("Descrição", text="Descrição")
         self.tabela.heading("Status", text="Status")
 
-        self.tabela.grid(row=4, column=1, columnspan=3, pady=(15, 0))
+        self.tabela.grid(row=5, column=1, columnspan=3, pady=(15, 0))
         self.tabela.bind("<<TreeviewSelect>>", selecionar_tarefa)
 
         carregar_tarefas("Todos")
 
 
-# -------------------------------------------------------------
+# =============================================================
 # INICIALIZAÇÃO
-# -------------------------------------------------------------
+# =============================================================
 
 root = ctk.CTk()
 app = ger_tar_app(root)
